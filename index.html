@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GrassLock - Touch Grass AI</title>
+  <!-- Open-Source ML in browser -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0f172a;
+      color: #f8fafc;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      margin: 0;
+    }
+    h1 { color: #4ade80; margin-bottom: 8px; }
+    p { color: #94a3b8; text-align: center; max-width: 480px; }
+    #video {
+      width: 100%;
+      max-width: 420px;
+      border-radius: 12px;
+      border: 3px solid #334155;
+      background: #000;
+    }
+    .badge {
+      margin-top: 16px;
+      padding: 10px 20px;
+      border-radius: 9999px;
+      font-weight: bold;
+      font-size: 1.1rem;
+    }
+    .indoor { background: #ef4444; color: white; }
+    .outdoor { background: #22c55e; color: white; }
+    #status { margin-top: 12px; font-size: 0.95rem; color: #cbd5e1; }
+  </style>
+</head>
+<body>
+  <h1>🌱 GrassLock</h1>
+  <p>Step away from the screen! Point your camera at real grass, a leaf, or a tree to prove you touched grass.</p>
+
+  <video id="video" autoplay playsinline muted></video>
+  <div id="badge" class="badge indoor">Looking for Nature...</div>
+  <div id="status">Loading open-weight MobileNet model...</div>
+
+  <script>
+    const video = document.getElementById('video');
+    const badge = document.getElementById('badge');
+    const status = document.getElementById('status');
+    let model = null;
+
+    const natureKeywords = ['plant', 'leaf', 'tree', 'grass', 'pot', 'flower', 'daisy', 'lawn', 'garden', 'forest'];
+
+    async function init() {
+      // 1. Camera Access
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment' }
+        });
+        video.srcObject = stream;
+      } catch (err) {
+        status.innerText = "Camera permission denied or not available.";
+        return;
+      }
+
+      // 2. Load Open-Source MobileNet locally in memory
+      status.innerText = "Downloading MobileNet weights into browser...";
+      model = await mobilenet.load();
+      status.innerText = "Model loaded! Scanning your surroundings...";
+
+      // 3. Continuous local classification loop
+      setInterval(detectSurroundings, 1200);
+    }
+
+    async function detectSurroundings() {
+      if (!model || video.readyState !== 4) return;
+
+      const predictions = await model.classify(video);
+      const topPrediction = predictions[0];
+      const detectedClass = topPrediction ? topPrediction.className.toLowerCase() : "";
+
+      const isNature = natureKeywords.some(keyword => detectedClass.includes(keyword));
+
+      if (isNature) {
+        badge.className = "badge outdoor";
+        badge.innerText = "Verified: Touched Grass! 🌿";
+        status.innerText = `Detected: ${topPrediction.className} (${Math.round(topPrediction.probability * 100)}% match)`;
+      } else {
+        badge.className = "badge indoor";
+        badge.innerText = "Still on Screen / Indoor ❌";
+        status.innerText = `Detected: ${topPrediction ? topPrediction.className : "Scanning..."}`;
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
